@@ -31,18 +31,22 @@ COPY --from=builder /root/.local /home/appuser/.local
 # Copy application code
 COPY --chown=appuser:appuser . .
 
+# Copy and set permissions for startup script (as root, before switching user)
+COPY start.sh /app/start.sh
+RUN chmod +x /app/start.sh && chown appuser:appuser /app/start.sh
+
 # Switch to non-root user
 USER appuser
 
 # Add local bin to PATH
 ENV PATH=/home/appuser/.local/bin:$PATH
 
-# Expose port (Cloud Run will set PORT env var)
+# Expose port (PORT env var will be used at runtime via start.sh)
 EXPOSE 8080
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD python -c "import requests; requests.get('http://localhost:8080/api/health')" || exit 1
+    CMD python -c "import requests; import os; port = os.getenv('PORT', '8080'); requests.get(f'http://localhost:{port}/api/health')" || exit 1
 
-# Run application
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080"]
+# Run application - use PORT env var if set, otherwise default to 8080
+CMD ["/app/start.sh"]
