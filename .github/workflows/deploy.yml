@@ -1,0 +1,17 @@
+# GitHub Actions for automatic deployment (optional)
+# This auto-deploys when you push to main branch
+
+name: Deploy
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  # You can add automated deployment here if needed
+  # Most platforms (Render, Cloudflare) auto-deploy on git push
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deployment notification
+        run: echo "Deployment triggered - platforms will auto-deploy"
