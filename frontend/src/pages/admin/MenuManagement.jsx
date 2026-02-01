@@ -15,10 +15,6 @@ const MenuManagement = () => {
   const [editingItem, setEditingItem] = useState(null);
   const [editingCategory, setEditingCategory] = useState(null);
 
-  const getAuthHeaders = () => ({
-    Authorization: `Bearer ${localStorage.getItem('admin_token')}`
-  });
-
   useEffect(() => {
     fetchData();
   }, []);
@@ -27,8 +23,8 @@ const MenuManagement = () => {
     try {
       setLoading(true);
       const [catsRes, itemsRes] = await Promise.all([
-        api.get('/api/admin/categories', { headers: getAuthHeaders() }),
-        api.get('/api/admin/menu-items', { headers: getAuthHeaders() })
+        api.get('/api/admin/categories'),
+        api.get('/api/admin/menu-items')
       ]);
       setCategories(catsRes.data);
       setMenuItems(itemsRes.data);
@@ -43,7 +39,7 @@ const MenuManagement = () => {
     if (!window.confirm('Are you sure you want to delete this item?')) return;
     
     try {
-      await api.delete(`/api/admin/menu-items/${id}`, { headers: getAuthHeaders() });
+      await api.delete(`/api/admin/menu-items/${id}`);
       toast.success('Item deleted');
       fetchData();
     } catch (error) {
@@ -55,7 +51,7 @@ const MenuManagement = () => {
     if (!window.confirm('Are you sure? This will delete all items in this category!')) return;
     
     try {
-      await api.delete(`/api/admin/categories/${id}`, { headers: getAuthHeaders() });
+      await api.delete(`/api/admin/categories/${id}`);
       toast.success('Category deleted');
       fetchData();
     } catch (error) {
@@ -221,20 +217,16 @@ const MenuItemForm = ({ item, categories, onClose, onSuccess }) => {
   });
   const [loading, setLoading] = useState(false);
 
-  const getAuthHeaders = () => ({
-    Authorization: `Bearer ${localStorage.getItem('admin_token')}`
-  });
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
 
     try {
       if (item) {
-        await api.put(`/api/admin/menu-items/${item.id}`, formData, { headers: getAuthHeaders() });
+        await api.put(`/api/admin/menu-items/${item.id}`, formData);
         toast.success('Item updated');
       } else {
-        await api.post('/api/admin/menu-items', formData, { headers: getAuthHeaders() });
+        await api.post('/api/admin/menu-items', formData);
         toast.success('Item created');
       }
       onSuccess();
@@ -345,20 +337,16 @@ const CategoryForm = ({ category, onClose, onSuccess }) => {
   });
   const [loading, setLoading] = useState(false);
 
-  const getAuthHeaders = () => ({
-    Authorization: `Bearer ${localStorage.getItem('admin_token')}`
-  });
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
 
     try {
       if (category) {
-        await api.put(`/api/admin/categories/${category.id}`, formData, { headers: getAuthHeaders() });
+        await api.put(`/api/admin/categories/${category.id}`, formData);
         toast.success('Category updated');
       } else {
-        await api.post('/api/admin/categories', formData, { headers: getAuthHeaders() });
+        await api.post('/api/admin/categories', formData);
         toast.success('Category created');
       }
       onSuccess();

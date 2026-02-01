@@ -11,10 +11,6 @@ const TableManagement = () => {
   const [showForm, setShowForm] = useState(false);
   const [editingTable, setEditingTable] = useState(null);
 
-  const getAuthHeaders = () => ({
-    Authorization: `Bearer ${localStorage.getItem('admin_token')}`
-  });
-
   useEffect(() => {
     fetchTables();
   }, []);
@@ -22,7 +18,7 @@ const TableManagement = () => {
   const fetchTables = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/api/admin/tables', { headers: getAuthHeaders() });
+      const response = await api.get('/api/admin/tables');
       setTables(response.data);
     } catch (error) {
       toast.error('Failed to load tables');
@@ -35,7 +31,7 @@ const TableManagement = () => {
     if (!window.confirm(`Are you sure you want to delete Table ${tableNumber}?`)) return;
     
     try {
-      await api.delete(`/api/admin/tables/${tableId}`, { headers: getAuthHeaders() });
+      await api.delete(`/api/admin/tables/${tableId}`);
       toast.success('Table deleted');
       fetchTables();
     } catch (error) {
@@ -47,8 +43,7 @@ const TableManagement = () => {
     try {
       await api.put(
         `/api/admin/tables/${table.id}`,
-        { is_active: !table.is_active },
-        { headers: getAuthHeaders() }
+        { is_active: !table.is_active }
       );
       toast.success(`Table ${table.table_number} ${!table.is_active ? 'activated' : 'deactivated'}`);
       fetchTables();
@@ -166,10 +161,6 @@ const TableForm = ({ table, existingTables, onClose, onSuccess }) => {
   const [isActive, setIsActive] = useState(table?.is_active ?? true);
   const [loading, setLoading] = useState(false);
 
-  const getAuthHeaders = () => ({
-    Authorization: `Bearer ${localStorage.getItem('admin_token')}`
-  });
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     
@@ -190,8 +181,7 @@ const TableForm = ({ table, existingTables, onClose, onSuccess }) => {
       if (table) {
         await api.put(
           `/api/admin/tables/${table.id}`,
-          { is_active: isActive, qr_code_url: null },
-          { headers: getAuthHeaders() }
+          { is_active: isActive, qr_code_url: null }
         );
         toast.success('Table updated');
       } else {
@@ -200,8 +190,7 @@ const TableForm = ({ table, existingTables, onClose, onSuccess }) => {
           { 
             table_number: parseInt(tableNumber), 
             is_active: isActive 
-          },
-          { headers: getAuthHeaders() }
+          }
         );
         toast.success('Table created');
       }

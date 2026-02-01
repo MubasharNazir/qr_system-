@@ -17,7 +17,9 @@ api.interceptors.request.use(
   (config) => {
     // Add admin token if available (for admin routes)
     const adminToken = localStorage.getItem('admin_token');
-    if (adminToken && !config.headers.Authorization) {
+    if (adminToken) {
+      // Always set Authorization header, even if already present (to ensure it's correct)
+      config.headers = config.headers || {};
       config.headers.Authorization = `Bearer ${adminToken}`;
     }
     
