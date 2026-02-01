@@ -6,11 +6,23 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sess
 from sqlalchemy.orm import declarative_base
 from app.config import settings
 
-# Create async engine
+# Create async engine with SSL for Supabase
+# Supabase requires SSL connections
+# For asyncpg, we need to pass ssl parameter in the connection string or connect_args
+import ssl
+
+connect_args = {}
+if "supabase.co" in settings.DATABASE_URL or "pooler.supabase.com" in settings.DATABASE_URL:
+    # Enable SSL for Supabase connections (asyncpg requires ssl.SSLContext or True)
+    connect_args = {
+        "ssl": True  # asyncpg will use default SSL context
+    }
+
 engine = create_async_engine(
     settings.DATABASE_URL,
     echo=settings.ENVIRONMENT == "development",
     future=True,
+    connect_args=connect_args,
 )
 
 # Create async session factory
