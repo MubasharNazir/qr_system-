@@ -102,7 +102,7 @@ async def create_checkout_session(
             "total_amount": float(order.total_amount),
             "customer_name": order.customer_name,
             "special_instructions": order.special_instructions,
-            "payment_status": order.payment_status.value,
+            "payment_status": order.payment_status,
             "created_at": order.created_at.isoformat(),
         }
         await manager.broadcast_order(order_data)
@@ -152,7 +152,7 @@ async def create_order_without_payment(
         order_total = float(order.total_amount)
         order_customer_name = order.customer_name
         order_instructions = order.special_instructions
-        order_status = order.payment_status.value
+        order_status = order.payment_status
         
         await db.commit()
         

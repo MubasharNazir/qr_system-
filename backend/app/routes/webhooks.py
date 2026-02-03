@@ -61,7 +61,7 @@ async def stripe_webhook(
         await OrderService.update_order_payment_status(
             db=db,
             order_id=order.id,
-            payment_status=PaymentStatus.PAID,
+            payment_status=PaymentStatus.PAID.value,
             stripe_payment_intent_id=payment_intent_id,
         )
         
@@ -86,7 +86,7 @@ async def stripe_webhook(
             await OrderService.update_order_payment_status(
                 db=db,
                 order_id=order.id,
-                payment_status=PaymentStatus.FAILED,
+                payment_status=PaymentStatus.FAILED.value,
             )
             await db.commit()
             logger.info(f"Order {order.id} marked as failed")

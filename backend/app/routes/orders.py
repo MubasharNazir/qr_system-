@@ -39,7 +39,7 @@ async def get_order(
         total_amount=float(order.total_amount),
         customer_name=order.customer_name,
         special_instructions=order.special_instructions,
-        payment_status=order.payment_status.value,
+        payment_status=order.payment_status,
         created_at=order.created_at,
     )
 
@@ -68,6 +68,6 @@ async def get_order_by_session(
         total_amount=float(order.total_amount),
         customer_name=order.customer_name,
         special_instructions=order.special_instructions,
-        payment_status=order.payment_status.value,
+        payment_status=order.payment_status,
         created_at=order.created_at,
     )

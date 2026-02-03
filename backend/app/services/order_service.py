@@ -77,7 +77,7 @@ class OrderService:
             total_amount=total_amount,
             customer_name=customer_name,
             special_instructions=special_instructions,
-            payment_status=PaymentStatus.PENDING,
+            payment_status=PaymentStatus.PENDING.value,
         )
         
         db.add(order)
@@ -99,7 +99,7 @@ class OrderService:
         Args:
             db: Database session
             order_id: Order UUID
-            payment_status: New payment status
+            payment_status: New payment status (PaymentStatus enum or string)
             stripe_session_id: Optional Stripe session ID
             stripe_payment_intent_id: Optional Stripe payment intent ID
             
@@ -114,7 +114,12 @@ class OrderService:
         if not order:
             return None
         
-        order.payment_status = payment_status
+        # Convert enum to string if needed
+        if isinstance(payment_status, PaymentStatus):
+            order.payment_status = payment_status.value
+        else:
+            order.payment_status = payment_status
+            
         if stripe_session_id:
             order.stripe_session_id = stripe_session_id
         if stripe_payment_intent_id:
