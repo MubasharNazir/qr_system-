@@ -3,6 +3,7 @@ Pydantic schemas for checkout API requests/responses.
 """
 from pydantic import BaseModel, Field
 from typing import Optional
+from uuid import UUID
 
 
 class CheckoutItem(BaseModel):
@@ -22,3 +23,17 @@ class CheckoutRequest(BaseModel):
 class CheckoutResponse(BaseModel):
     """Checkout session creation response."""
     checkout_url: str = Field(..., description="Stripe Checkout URL")
+
+
+class OrderCreateRequest(BaseModel):
+    """Order creation request (without payment)."""
+    table_id: int = Field(..., description="Table number")
+    items: list[CheckoutItem] = Field(..., min_length=1, description="At least one item required")
+    customer_name: Optional[str] = Field(None, max_length=200, description="Optional customer name")
+    special_instructions: Optional[str] = Field(None, max_length=1000, description="Special instructions")
+
+
+class OrderCreateResponse(BaseModel):
+    """Order creation response."""
+    order_id: UUID = Field(..., description="Created order ID")
+    message: str = Field(..., description="Success message")

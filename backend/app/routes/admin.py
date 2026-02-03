@@ -2,7 +2,7 @@
 Admin API routes for restaurant management.
 Protected with static password authentication.
 """
-from fastapi import APIRouter, Depends, HTTPException, Header
+from fastapi import APIRouter, Depends, HTTPException, Header, WebSocket, WebSocketDisconnect
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update, delete
 from typing import Optional
@@ -22,6 +22,7 @@ from app.schemas.admin import (
     TableUpdate,
 )
 from app.config import settings
+from app.services.websocket_manager import manager
 import secrets
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -439,3 +440,42 @@ async def get_qr_code_info(
             for t in tables
         ]
     }
+
+
+# ==================== WebSocket for Order Notifications ====================
+
+@router.websocket("/orders/ws")
+async def websocket_orders(websocket: WebSocket, token: Optional[str] = None):
+    """
+    WebSocket endpoint for real-time order notifications.
+    Requires admin authentication token as query parameter.
+    """
+    # Get token from query parameter
+    token = websocket.query_params.get("token")
+    
+    if not token:
+        await websocket.close(code=1008, reason="Missing authentication token")
+        return
+    
+    # Verify token
+    if token not in admin_sessions:
+        await websocket.close(code=1008, reason="Invalid authentication token")
+        return
+    
+    # Connect to WebSocket manager
+    await manager.connect(websocket)
+    
+    try:
+        # Keep connection alive and listen for messages
+        while True:
+            # Wait for any message (ping/pong for keepalive)
+            data = await websocket.receive_text()
+            # Echo back for keepalive (optional)
+            if data == "ping":
+                await websocket.send_text("pong")
+    except WebSocketDisconnect:
+        manager.disconnect(websocket)
+    except Exception as e:
+        import logging
+        logging.error(f"WebSocket error: {e}")
+        manager.disconnect(websocket)

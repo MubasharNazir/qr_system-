@@ -7,9 +7,10 @@ from sqlalchemy import select
 from app.database import get_db
 from app.config import settings
 from app.models.table import Table
-from app.schemas.checkout import CheckoutRequest, CheckoutResponse
+from app.schemas.checkout import CheckoutRequest, CheckoutResponse, OrderCreateRequest, OrderCreateResponse
 from app.services.order_service import OrderService
 from app.services.stripe_service import StripeService
+from app.services.websocket_manager import manager
 
 router = APIRouter()
 
@@ -90,5 +91,91 @@ async def create_checkout_session(
     # Update order with Stripe session ID
     order.stripe_session_id = session_data["session_id"]
     await db.commit()
+    await db.refresh(order)
+    
+    # Broadcast new order to connected admin clients
+    try:
+        order_data = {
+            "id": str(order.id),
+            "table_number": table_obj.table_number,
+            "items": order.items,
+            "total_amount": float(order.total_amount),
+            "customer_name": order.customer_name,
+            "special_instructions": order.special_instructions,
+            "payment_status": order.payment_status.value,
+            "created_at": order.created_at.isoformat(),
+        }
+        await manager.broadcast_order(order_data)
+    except Exception as e:
+        # Don't fail the request if WebSocket broadcast fails
+        import logging
+        logging.error(f"Failed to broadcast order: {e}")
     
     return CheckoutResponse(checkout_url=session_data["checkout_url"])
+
+
+@router.post("/orders/create", response_model=OrderCreateResponse)
+async def create_order_without_payment(
+    request: OrderCreateRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Create an order without payment (for pay-later option).
+    Order will be created with 'pending' payment status.
+    """
+    # Validate table exists and is active
+    table_result = await db.execute(
+        select(Table).where(Table.table_number == request.table_id, Table.is_active == True)
+    )
+    table_obj = table_result.scalar_one_or_none()
+    
+    if not table_obj:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Table {request.table_id} not found or inactive"
+        )
+    
+    # Create order in database (without Stripe session)
+    try:
+        order = await OrderService.create_order(
+            db=db,
+            table_id=request.table_id,
+            checkout_items=request.items,
+            customer_name=request.customer_name,
+            special_instructions=request.special_instructions,
+        )
+        await db.commit()
+    except ValueError as e:
+        await db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to create order: {str(e)}"
+        )
+    
+    await db.refresh(order)
+    
+    # Broadcast new order to connected admin clients
+    try:
+        order_data = {
+            "id": str(order.id),
+            "table_number": table_obj.table_number,
+            "items": order.items,
+            "total_amount": float(order.total_amount),
+            "customer_name": order.customer_name,
+            "special_instructions": order.special_instructions,
+            "payment_status": order.payment_status.value,
+            "created_at": order.created_at.isoformat(),
+        }
+        await manager.broadcast_order(order_data)
+    except Exception as e:
+        # Don't fail the request if WebSocket broadcast fails
+        import logging
+        logging.error(f"Failed to broadcast order: {e}")
+    
+    return OrderCreateResponse(
+        order_id=order.id,
+        message="Order placed successfully. Payment can be completed later."
+    )
