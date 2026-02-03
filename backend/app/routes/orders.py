@@ -4,6 +4,7 @@ Orders API routes.
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 from uuid import UUID
 from app.database import get_db
 from app.models.order import Order
@@ -22,7 +23,9 @@ async def get_order(
     Get order details by ID.
     """
     result = await db.execute(
-        select(Order).where(Order.id == order_id)
+        select(Order)
+        .options(selectinload(Order.table))  # Eagerly load table relationship
+        .where(Order.id == order_id)
     )
     order = result.scalar_one_or_none()
     
@@ -53,7 +56,13 @@ async def get_order_by_session(
     Get order details by Stripe session ID.
     Useful for order confirmation page.
     """
-    order = await OrderService.get_order_by_session_id(db, session_id)
+    # Get order with table relationship loaded
+    result = await db.execute(
+        select(Order)
+        .options(selectinload(Order.table))  # Eagerly load table relationship
+        .where(Order.stripe_session_id == session_id)
+    )
+    order = result.scalar_one_or_none()
     
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")

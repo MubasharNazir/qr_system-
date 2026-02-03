@@ -5,6 +5,7 @@ Protected with static password authentication.
 from fastapi import APIRouter, Depends, HTTPException, Header, WebSocket, WebSocketDisconnect
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update, delete
+from sqlalchemy.orm import selectinload
 from typing import Optional
 from app.database import get_db
 from app.models.category import Category
@@ -284,6 +285,7 @@ async def get_orders(
     """Get recent orders."""
     result = await db.execute(
         select(Order)
+        .options(selectinload(Order.table))  # Eagerly load table relationship
         .order_by(Order.created_at.desc())
         .limit(limit)
     )
