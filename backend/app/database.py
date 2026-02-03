@@ -11,11 +11,17 @@ from app.config import settings
 # For asyncpg, we need to pass ssl parameter in the connection string or connect_args
 import ssl
 
+# Configure SSL for Supabase connections
 connect_args = {}
 if "supabase.co" in settings.DATABASE_URL or "pooler.supabase.com" in settings.DATABASE_URL:
-    # Enable SSL for Supabase connections (asyncpg requires ssl.SSLContext or True)
+    # Create a permissive SSL context for Supabase pooler
+    # Disable certificate verification to handle self-signed certificates
+    ssl_context = ssl.create_default_context()
+    ssl_context.check_hostname = False
+    ssl_context.verify_mode = ssl.CERT_NONE
+    # For asyncpg, we need to pass the SSL context
     connect_args = {
-        "ssl": True  # asyncpg will use default SSL context
+        "ssl": ssl_context
     }
 
 engine = create_async_engine(
@@ -23,6 +29,8 @@ engine = create_async_engine(
     echo=settings.ENVIRONMENT == "development",
     future=True,
     connect_args=connect_args,
+    pool_pre_ping=True,  # Verify connections before using them
+    pool_recycle=3600,   # Recycle connections after 1 hour
 )
 
 # Create async session factory

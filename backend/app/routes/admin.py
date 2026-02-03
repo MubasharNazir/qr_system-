@@ -78,9 +78,12 @@ async def get_categories(
     token: str = Depends(verify_admin_token),
 ):
     """Get all categories."""
-    result = await db.execute(select(Category).order_by(Category.display_order, Category.id))
-    categories = result.scalars().all()
-    return [{"id": c.id, "name": c.name, "display_order": c.display_order} for c in categories]
+    try:
+        result = await db.execute(select(Category).order_by(Category.display_order, Category.id))
+        categories = result.scalars().all()
+        return [{"id": c.id, "name": c.name, "display_order": c.display_order} for c in categories]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
 
 @router.post("/categories")
@@ -150,22 +153,25 @@ async def get_menu_items(
     token: str = Depends(verify_admin_token),
 ):
     """Get all menu items."""
-    result = await db.execute(
-        select(MenuItem).order_by(MenuItem.category_id, MenuItem.id)
-    )
-    items = result.scalars().all()
-    return [
-        {
-            "id": item.id,
-            "category_id": item.category_id,
-            "name": item.name,
-            "description": item.description,
-            "price": float(item.price),
-            "image_url": item.image_url,
-            "is_available": item.is_available,
-        }
-        for item in items
-    ]
+    try:
+        result = await db.execute(
+            select(MenuItem).order_by(MenuItem.category_id, MenuItem.id)
+        )
+        items = result.scalars().all()
+        return [
+            {
+                "id": item.id,
+                "category_id": item.category_id,
+                "name": item.name,
+                "description": item.description,
+                "price": float(item.price),
+                "image_url": item.image_url,
+                "is_available": item.is_available,
+            }
+            for item in items
+        ]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
 
 @router.post("/menu-items")
@@ -305,19 +311,22 @@ async def get_tables(
     token: str = Depends(verify_admin_token),
 ):
     """Get all tables."""
-    result = await db.execute(
-        select(Table).order_by(Table.table_number)
-    )
-    tables = result.scalars().all()
-    return [
-        {
-            "id": t.id,
-            "table_number": t.table_number,
-            "qr_code_url": t.qr_code_url,
-            "is_active": t.is_active,
-        }
-        for t in tables
-    ]
+    try:
+        result = await db.execute(
+            select(Table).order_by(Table.table_number)
+        )
+        tables = result.scalars().all()
+        return [
+            {
+                "id": t.id,
+                "table_number": t.table_number,
+                "qr_code_url": t.qr_code_url,
+                "is_active": t.is_active,
+            }
+            for t in tables
+        ]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
 
 @router.post("/tables")
