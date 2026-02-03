@@ -144,38 +144,53 @@ async def create_order_without_payment(
             customer_name=request.customer_name,
             special_instructions=request.special_instructions,
         )
+        
+        # Get order data before commit (to avoid detached instance issues)
+        order_id = order.id  # Keep as UUID for return
+        order_id_str = str(order.id)  # String version for broadcast
+        order_items = order.items
+        order_total = float(order.total_amount)
+        order_customer_name = order.customer_name
+        order_instructions = order.special_instructions
+        order_status = order.payment_status.value
+        
         await db.commit()
+        
+        # Get created_at after commit by querying if needed, or use current time
+        from datetime import datetime
+        order_created_at = datetime.utcnow().isoformat()
+        
     except ValueError as e:
         await db.rollback()
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         await db.rollback()
+        import logging
+        logging.error(f"Error creating order: {e}", exc_info=True)
         raise HTTPException(
             status_code=500,
             detail=f"Failed to create order: {str(e)}"
         )
     
-    await db.refresh(order)
-    
-    # Broadcast new order to connected admin clients
+    # Broadcast new order to connected admin clients (don't fail request if this fails)
     try:
         order_data = {
-            "id": str(order.id),
+            "id": order_id_str,
             "table_number": table_obj.table_number,
-            "items": order.items,
-            "total_amount": float(order.total_amount),
-            "customer_name": order.customer_name,
-            "special_instructions": order.special_instructions,
-            "payment_status": order.payment_status.value,
-            "created_at": order.created_at.isoformat(),
+            "items": order_items,
+            "total_amount": order_total,
+            "customer_name": order_customer_name,
+            "special_instructions": order_instructions,
+            "payment_status": order_status,
+            "created_at": order_created_at,
         }
         await manager.broadcast_order(order_data)
     except Exception as e:
         # Don't fail the request if WebSocket broadcast fails
         import logging
-        logging.error(f"Failed to broadcast order: {e}")
+        logging.error(f"Failed to broadcast order: {e}", exc_info=True)
     
     return OrderCreateResponse(
-        order_id=order.id,
+        order_id=order_id,
         message="Order placed successfully. Payment can be completed later."
     )
