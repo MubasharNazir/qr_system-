@@ -18,10 +18,11 @@ const CartDrawer = ({ isOpen, onClose, tableId }) => {
   const [customerName, setCustomerName] = useState('');
   const [specialInstructions, setSpecialInstructions] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [processingType, setProcessingType] = useState(null); // 'payment' or 'order'
 
   const total = getTotal();
 
-  const handleCheckout = async () => {
+  const handlePlaceOrder = async (withPayment = false) => {
     if (items.length === 0) {
       toast.error('Your cart is empty');
       return;
@@ -33,6 +34,7 @@ const CartDrawer = ({ isOpen, onClose, tableId }) => {
     }
 
     setIsProcessing(true);
+    setProcessingType(withPayment ? 'payment' : 'order');
 
     try {
       // Prepare checkout request
@@ -41,22 +43,41 @@ const CartDrawer = ({ isOpen, onClose, tableId }) => {
         quantity: item.quantity,
       }));
 
-      const response = await api.post('/api/checkout/create-session', {
-        table_id: tableId,
-        items: checkoutItems,
-        customer_name: customerName || null,
-        special_instructions: specialInstructions || null,
-      });
+      if (withPayment) {
+        // Create Stripe checkout session
+        const response = await api.post('/api/checkout/create-session', {
+          table_id: tableId,
+          items: checkoutItems,
+          customer_name: customerName || null,
+          special_instructions: specialInstructions || null,
+        });
 
-      // Redirect to Stripe Checkout
-      window.location.href = response.data.checkout_url;
+        // Redirect to Stripe Checkout
+        window.location.href = response.data.checkout_url;
+      } else {
+        // Create order without payment
+        const response = await api.post('/api/orders/create', {
+          table_id: tableId,
+          items: checkoutItems,
+          customer_name: customerName || null,
+          special_instructions: specialInstructions || null,
+        });
+
+        // Clear cart and show success
+        clearCart();
+        toast.success('Order placed successfully!');
+        
+        // Redirect to order confirmation
+        navigate(`/order-confirmation?order_id=${response.data.order_id}`);
+      }
     } catch (error) {
-      console.error('Checkout error:', error);
+      console.error('Order error:', error);
       toast.error(
         error.response?.data?.detail ||
-          'Failed to create checkout session. Please try again.'
+          `Failed to ${withPayment ? 'create checkout session' : 'place order'}. Please try again.`
       );
       setIsProcessing(false);
+      setProcessingType(null);
     }
   };
 
@@ -158,14 +179,23 @@ const CartDrawer = ({ isOpen, onClose, tableId }) => {
               </span>
             </div>
 
-            {/* Checkout Button */}
-            <button
-              onClick={handleCheckout}
-              disabled={isProcessing}
-              className="w-full bg-blue-600 text-white py-3 rounded-md font-semibold hover:bg-blue-700 active:bg-blue-800 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
-            >
-              {isProcessing ? 'Processing...' : 'Proceed to Payment'}
-            </button>
+            {/* Action Buttons */}
+            <div className="space-y-2">
+              <button
+                onClick={() => handlePlaceOrder(false)}
+                disabled={isProcessing}
+                className="w-full bg-gray-600 text-white py-3 rounded-md font-semibold hover:bg-gray-700 active:bg-gray-800 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+              >
+                {isProcessing && processingType === 'order' ? 'Placing Order...' : 'Place Order'}
+              </button>
+              <button
+                onClick={() => handlePlaceOrder(true)}
+                disabled={isProcessing}
+                className="w-full bg-blue-600 text-white py-3 rounded-md font-semibold hover:bg-blue-700 active:bg-blue-800 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+              >
+                {isProcessing && processingType === 'payment' ? 'Processing...' : 'Pay Now'}
+              </button>
+            </div>
           </div>
         )}
       </div>

@@ -1,13 +1,15 @@
 /**
- * Admin dashboard main page.
+ * Admin dashboard main page with corporate design.
  */
-import React from 'react';
-import { Link, Outlet, useNavigate } from 'react-router-dom';
+import React, { useState } from 'react';
+import { Link, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import api from '../../services/api';
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const [sidebarOpen, setSidebarOpen] = useState(true);
 
   const handleLogout = async () => {
     try {
@@ -26,62 +28,100 @@ const AdminDashboard = () => {
     }
   };
 
+  const isActive = (path) => location.pathname === path;
+
+  const menuItems = [
+    { path: '/admin/dashboard', label: 'Dashboard', icon: '📊' },
+    { path: '/admin/orders', label: 'Orders', icon: '📦' },
+    { path: '/admin/menu', label: 'Menu', icon: '🍽️' },
+    { path: '/admin/tables', label: 'Tables', icon: '🪑' },
+    { path: '/admin/qr-codes', label: 'QR Codes', icon: '📱' },
+  ];
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+    <div className="min-h-screen bg-gray-50 flex">
+      {/* Sidebar */}
+      <aside className={`${sidebarOpen ? 'w-64' : 'w-20'} bg-gradient-to-b from-slate-900 to-slate-800 text-white transition-all duration-300 flex flex-col shadow-xl`}>
+        {/* Logo/Brand */}
+        <div className="p-6 border-b border-slate-700">
           <div className="flex items-center justify-between">
-            <h1 className="text-2xl font-bold text-gray-900">Admin Dashboard</h1>
+            {sidebarOpen && (
+              <h1 className="text-xl font-bold text-white">Restaurant Admin</h1>
+            )}
             <button
-              onClick={handleLogout}
-              className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors"
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+              className="p-2 hover:bg-slate-700 rounded-lg transition-colors"
             >
-              Logout
+              {sidebarOpen ? '◀' : '▶'}
             </button>
           </div>
         </div>
-      </header>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Navigation */}
-        <nav className="mb-8">
-          <div className="flex space-x-4 border-b border-gray-200">
+        <nav className="flex-1 p-4 space-y-2">
+          {menuItems.map((item) => (
             <Link
-              to="/admin/dashboard"
-              className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-blue-600 border-b-2 border-transparent hover:border-blue-600 transition-colors"
+              key={item.path}
+              to={item.path}
+              className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 ${
+                isActive(item.path)
+                  ? 'bg-blue-600 text-white shadow-lg'
+                  : 'text-slate-300 hover:bg-slate-700 hover:text-white'
+              }`}
             >
-              Dashboard
+              <span className="text-xl">{item.icon}</span>
+              {sidebarOpen && (
+                <span className="font-medium">{item.label}</span>
+              )}
             </Link>
-            <Link
-              to="/admin/menu"
-              className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-blue-600 border-b-2 border-transparent hover:border-blue-600 transition-colors"
-            >
-              Menu Management
-            </Link>
-            <Link
-              to="/admin/orders"
-              className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-blue-600 border-b-2 border-transparent hover:border-blue-600 transition-colors"
-            >
-              Orders
-            </Link>
-            <Link
-              to="/admin/tables"
-              className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-blue-600 border-b-2 border-transparent hover:border-blue-600 transition-colors"
-            >
-              Tables
-            </Link>
-            <Link
-              to="/admin/qr-codes"
-              className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-blue-600 border-b-2 border-transparent hover:border-blue-600 transition-colors"
-            >
-              QR Codes
-            </Link>
-          </div>
+          ))}
         </nav>
 
-        {/* Content */}
-        <Outlet />
+        {/* User Section */}
+        <div className="p-4 border-t border-slate-700">
+          <button
+            onClick={handleLogout}
+            className={`flex items-center gap-3 w-full px-4 py-3 rounded-lg text-slate-300 hover:bg-red-600 hover:text-white transition-all duration-200 ${
+              !sidebarOpen && 'justify-center'
+            }`}
+          >
+            <span className="text-xl">🚪</span>
+            {sidebarOpen && <span className="font-medium">Logout</span>}
+          </button>
+        </div>
+      </aside>
+
+      {/* Main Content */}
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {/* Top Header */}
+        <header className="bg-white shadow-sm border-b border-gray-200 z-10">
+          <div className="px-6 py-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900">
+                  {menuItems.find(item => isActive(item.path))?.label || 'Dashboard'}
+                </h2>
+                <p className="text-sm text-gray-500 mt-1">Manage your restaurant operations</p>
+              </div>
+              <div className="flex items-center gap-4">
+                <div className="text-right">
+                  <p className="text-sm font-medium text-gray-900">Admin</p>
+                  <p className="text-xs text-gray-500">System Administrator</p>
+                </div>
+                <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center text-white font-semibold">
+                  A
+                </div>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        {/* Content Area */}
+        <main className="flex-1 overflow-y-auto bg-gray-50">
+          <div className="p-6">
+            <Outlet />
+          </div>
+        </main>
       </div>
     </div>
   );

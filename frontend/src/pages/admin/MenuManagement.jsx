@@ -29,7 +29,9 @@ const MenuManagement = () => {
       setCategories(catsRes.data);
       setMenuItems(itemsRes.data);
     } catch (error) {
-      toast.error('Failed to load data');
+      console.error('Failed to load data:', error);
+      const errorMessage = error.response?.data?.detail || error.message || 'Failed to load data';
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -232,7 +234,9 @@ const MenuItemForm = ({ item, categories, onClose, onSuccess }) => {
       onSuccess();
       onClose();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Failed to save item');
+      console.error('Failed to save item:', error);
+      const errorMessage = error.response?.data?.detail || error.message || 'Failed to save item';
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -352,7 +356,9 @@ const CategoryForm = ({ category, onClose, onSuccess }) => {
       onSuccess();
       onClose();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Failed to save category');
+      console.error('Failed to save category:', error);
+      const errorMessage = error.response?.data?.detail || error.message || 'Failed to save category';
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }

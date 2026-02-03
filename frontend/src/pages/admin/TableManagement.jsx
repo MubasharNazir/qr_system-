@@ -21,7 +21,9 @@ const TableManagement = () => {
       const response = await api.get('/api/admin/tables');
       setTables(response.data);
     } catch (error) {
-      toast.error('Failed to load tables');
+      console.error('Failed to load tables:', error);
+      const errorMessage = error.response?.data?.detail || error.message || 'Failed to load tables';
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -197,7 +199,9 @@ const TableForm = ({ table, existingTables, onClose, onSuccess }) => {
       onSuccess();
       onClose();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Failed to save table');
+      console.error('Failed to save table:', error);
+      const errorMessage = error.response?.data?.detail || error.message || 'Failed to save table';
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }

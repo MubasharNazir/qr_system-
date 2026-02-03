@@ -12,14 +12,15 @@ const OrderConfirmation = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const sessionId = searchParams.get('session_id');
+  const orderId = searchParams.get('order_id');
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const clearCart = useCartStore((state) => state.clearCart);
 
   useEffect(() => {
-    if (!sessionId) {
-      setError('Missing session ID');
+    if (!sessionId && !orderId) {
+      setError('Missing order information');
       setLoading(false);
       return;
     }
@@ -29,8 +30,14 @@ const OrderConfirmation = () => {
         setLoading(true);
         setError(null);
         
-        // Fetch order by session ID
-        const response = await api.get(`/api/orders/by-session/${sessionId}`);
+        // Fetch order by session ID or order ID
+        let response;
+        if (sessionId) {
+          response = await api.get(`/api/orders/by-session/${sessionId}`);
+        } else {
+          response = await api.get(`/api/orders/${orderId}`);
+        }
+        
         setOrder(response.data);
         clearCart(); // Clear cart on successful order
         toast.success('Order placed successfully!');
@@ -48,7 +55,7 @@ const OrderConfirmation = () => {
     };
 
     fetchOrder();
-  }, [sessionId, clearCart]);
+  }, [sessionId, orderId, clearCart]);
 
   if (loading) {
     return (
@@ -115,7 +122,9 @@ const OrderConfirmation = () => {
           Order Confirmed!
         </h1>
         <p className="text-gray-600 mb-6">
-          Thank you for your order. Your payment has been processed successfully.
+          {order?.payment_status === 'paid' 
+            ? 'Thank you for your order. Your payment has been processed successfully.'
+            : 'Thank you for your order. Payment can be completed later at the counter.'}
         </p>
         {order && (
           <div className="text-left bg-gray-50 rounded-lg p-4 mb-6">
