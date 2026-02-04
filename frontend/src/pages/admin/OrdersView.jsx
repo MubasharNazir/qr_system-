@@ -11,6 +11,10 @@ const OrdersView = () => {
   const [loading, setLoading] = useState(true);
   const [isConnected, setIsConnected] = useState(false);
   const wsRef = useRef(null);
+  const audioContextRef = useRef(null);
+  const oscillatorRef = useRef(null);
+  const gainNodeRef = useRef(null);
+  const ringingIntervalRef = useRef(null);
 
   const getAuthHeaders = () => ({
     Authorization: `Bearer ${localStorage.getItem('admin_token')}`
@@ -25,6 +29,7 @@ const OrdersView = () => {
       if (wsRef.current) {
         wsRef.current.close();
       }
+      stopRinging();
     };
   }, []);
 
@@ -63,13 +68,14 @@ const OrdersView = () => {
           if (message.type === 'new_order') {
             const newOrder = message.data;
             
-            // Play notification sound
-            playNotificationSound();
+            // Start continuous ringing for new pending orders
+            if (newOrder.order_status === 'pending') {
+              startRinging();
+            }
             
             // Show toast notification
             toast.success(`New order from Table ${newOrder.table_number}!`, {
               duration: 5000,
-              icon: '🔔',
             });
             
             // Add new order to the beginning of the list
@@ -81,6 +87,34 @@ const OrdersView = () => {
               }
               return [newOrder, ...prevOrders];
             });
+          } else if (message.type === 'order_status_update') {
+            const updatedOrder = message.data;
+            
+            // Stop ringing if order was accepted
+            if (updatedOrder.order_status === 'accepted') {
+              stopRinging();
+              toast.success(`Order from Table ${updatedOrder.table_number} accepted!`, {
+                duration: 3000,
+              });
+            } else if (updatedOrder.order_status === 'rejected') {
+              stopRinging();
+              toast.error(`Order from Table ${updatedOrder.table_number} rejected!`, {
+                duration: 3000,
+              });
+            } else if (updatedOrder.order_status === 'completed') {
+              toast.success(`Order from Table ${updatedOrder.table_number} completed!`, {
+                duration: 3000,
+              });
+            }
+            
+            // Update order in the list
+            setOrders((prevOrders) =>
+              prevOrders.map((order) =>
+                order.id === updatedOrder.order_id
+                  ? { ...order, order_status: updatedOrder.order_status }
+                  : order
+              )
+            );
           }
         } catch (error) {
           console.error('Error parsing WebSocket message:', error);
@@ -104,26 +138,87 @@ const OrdersView = () => {
     }
   };
 
-  const playNotificationSound = () => {
+  const startRinging = () => {
+    // If already ringing, don't start again
+    if (ringingIntervalRef.current) {
+      return;
+    }
+    
     try {
-      // Use Web Audio API to play a beep sound
-      const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-      const oscillator = audioContext.createOscillator();
-      const gainNode = audioContext.createGain();
+      // Create audio context if it doesn't exist
+      if (!audioContextRef.current) {
+        audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
+      }
       
-      oscillator.connect(gainNode);
-      gainNode.connect(audioContext.destination);
+      const playRing = () => {
+        if (!audioContextRef.current || !ringingIntervalRef.current) {
+          return;
+        }
+        
+        // Create oscillator for ringing sound
+        const oscillator = audioContextRef.current.createOscillator();
+        const gainNode = audioContextRef.current.createGain();
+        
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContextRef.current.destination);
+        
+        // Ring tone frequency (phone-like ring)
+        oscillator.frequency.value = 800;
+        oscillator.type = 'sine';
+        
+        // Set volume
+        gainNode.gain.setValueAtTime(0.3, audioContextRef.current.currentTime);
+        
+        oscillator.start();
+        oscillator.stop(audioContextRef.current.currentTime + 0.5);
+      };
       
-      oscillator.frequency.value = 800;
-      oscillator.type = 'sine';
+      // Play first ring immediately
+      playRing();
       
-      gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
-      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
-      
-      oscillator.start(audioContext.currentTime);
-      oscillator.stop(audioContext.currentTime + 0.3);
+      // Repeat ringing every 1 second
+      ringingIntervalRef.current = setInterval(() => {
+        // Check if there are still pending orders
+        setOrders((currentOrders) => {
+          const stillPending = currentOrders.some(order => order.order_status === 'pending');
+          if (!stillPending) {
+            stopRinging();
+            return currentOrders;
+          }
+          playRing();
+          return currentOrders;
+        });
+      }, 1000);
     } catch (error) {
-      console.error('Error playing notification sound:', error);
+      console.error('Error starting ringing:', error);
+    }
+  };
+
+  const stopRinging = () => {
+    try {
+      // Clear interval
+      if (ringingIntervalRef.current) {
+        clearInterval(ringingIntervalRef.current);
+        ringingIntervalRef.current = null;
+      }
+      
+      // Stop oscillator
+      if (oscillatorRef.current) {
+        try {
+          oscillatorRef.current.stop();
+        } catch (e) {
+          // Oscillator might already be stopped
+        }
+        oscillatorRef.current = null;
+      }
+      
+      // Close audio context
+      if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+        audioContextRef.current.close().catch(console.error);
+        audioContextRef.current = null;
+      }
+    } catch (error) {
+      console.error('Error stopping ringing:', error);
     }
   };
 
@@ -131,11 +226,112 @@ const OrdersView = () => {
     try {
       setLoading(true);
       const response = await api.get('/api/admin/orders', { headers: getAuthHeaders() });
-      setOrders(response.data);
+      const fetchedOrders = response.data;
+      setOrders(fetchedOrders);
+      
+      // Start ringing if there are pending orders
+      const hasPending = fetchedOrders.some(order => order.order_status === 'pending');
+      if (hasPending) {
+        startRinging();
+      } else {
+        stopRinging();
+      }
     } catch (error) {
       toast.error('Failed to load orders');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleAcceptOrder = async (orderId) => {
+    try {
+      const response = await api.put(
+        `/api/admin/orders/${orderId}/accept`,
+        {},
+        { headers: getAuthHeaders() }
+      );
+      
+      // Update order status locally and check if ringing should stop
+      setOrders((prevOrders) => {
+        const updated = prevOrders.map((order) =>
+          order.id === orderId
+            ? { ...order, order_status: 'accepted' }
+            : order
+        );
+        
+        // Stop ringing if no more pending orders
+        const stillPending = updated.filter(
+          order => order.order_status === 'pending'
+        );
+        if (stillPending.length === 0) {
+          stopRinging();
+        }
+        
+        return updated;
+      });
+      
+      toast.success('Order accepted successfully!');
+    } catch (error) {
+      toast.error('Failed to accept order');
+      console.error('Error accepting order:', error);
+    }
+  };
+
+  const handleRejectOrder = async (orderId) => {
+    try {
+      const response = await api.put(
+        `/api/admin/orders/${orderId}/reject`,
+        {},
+        { headers: getAuthHeaders() }
+      );
+      
+      // Update order status locally and check if ringing should stop
+      setOrders((prevOrders) => {
+        const updated = prevOrders.map((order) =>
+          order.id === orderId
+            ? { ...order, order_status: 'rejected' }
+            : order
+        );
+        
+        // Stop ringing if no more pending orders
+        const stillPending = updated.filter(
+          order => order.order_status === 'pending'
+        );
+        if (stillPending.length === 0) {
+          stopRinging();
+        }
+        
+        return updated;
+      });
+      
+      toast.success('Order rejected');
+    } catch (error) {
+      toast.error('Failed to reject order');
+      console.error('Error rejecting order:', error);
+    }
+  };
+
+  const handleCompleteOrder = async (orderId) => {
+    try {
+      const response = await api.put(
+        `/api/admin/orders/${orderId}/complete`,
+        {},
+        { headers: getAuthHeaders() }
+      );
+      
+      // Update order status locally
+      setOrders((prevOrders) =>
+        prevOrders.map((order) =>
+          order.id === orderId
+            ? { ...order, order_status: 'completed' }
+            : order
+        )
+      );
+      
+      toast.success('Order marked as completed!');
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to complete order');
+      console.error('Error completing order:', error);
     }
   };
 
@@ -152,6 +348,21 @@ const OrdersView = () => {
     }
   };
 
+  const getOrderStatusColor = (status) => {
+    switch (status) {
+      case 'accepted':
+        return 'bg-green-100 text-green-800';
+      case 'rejected':
+        return 'bg-red-100 text-red-800';
+      case 'pending':
+        return 'bg-yellow-100 text-yellow-800 animate-pulse';
+      case 'completed':
+        return 'bg-blue-100 text-blue-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
+  };
+
   if (loading) {
     return <div className="text-center py-12">Loading orders...</div>;
   }
@@ -162,8 +373,8 @@ const OrdersView = () => {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900">Orders Management</h2>
-            <p className="text-sm text-gray-500 mt-1">Monitor and manage all customer orders</p>
+            <h2 className="text-xl font-bold text-gray-900">Orders Management</h2>
+            <p className="text-xs text-gray-500 mt-0.5">Monitor and manage all customer orders</p>
           </div>
           {isConnected && (
             <div className="flex items-center gap-2 px-3 py-1.5 bg-green-50 border border-green-200 rounded-lg">
@@ -174,16 +385,15 @@ const OrdersView = () => {
         </div>
         <button
           onClick={fetchOrders}
-          className="px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg font-medium hover:from-blue-700 hover:to-blue-800 shadow-md hover:shadow-lg transition-all duration-200 flex items-center gap-2"
+          className="px-3 py-1.5 text-sm bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg font-medium hover:from-blue-700 hover:to-blue-800 shadow-md hover:shadow-lg transition-all duration-200"
         >
-          <span>🔄</span>
           Refresh
         </button>
       </div>
 
       {/* Stats Bar */}
       {orders.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
           <div className="bg-white rounded-lg border border-gray-200 p-4">
             <p className="text-sm text-gray-600 mb-1">Total Orders</p>
             <p className="text-2xl font-bold text-gray-900">{orders.length}</p>
@@ -206,15 +416,26 @@ const OrdersView = () => {
               {orders.filter(o => o.payment_status === 'failed').length}
             </p>
           </div>
+          <div className="bg-white rounded-lg border border-gray-200 p-4">
+            <p className="text-sm text-gray-600 mb-1">Unpaid Bills</p>
+            <p className="text-2xl font-bold text-red-600">
+              {orders.filter(o => o.payment_status === 'pending').length}
+            </p>
+          </div>
+          <div className="bg-white rounded-lg border border-gray-200 p-4">
+            <p className="text-sm text-gray-600 mb-1">Completed</p>
+            <p className="text-2xl font-bold text-blue-600">
+              {orders.filter(o => o.order_status === 'completed').length}
+            </p>
+          </div>
         </div>
       )}
 
       {/* Orders Table */}
       {orders.length === 0 ? (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-12 text-center">
-          <div className="text-6xl mb-4">📦</div>
-          <p className="text-lg font-semibold text-gray-900 mb-2">No orders yet</p>
-          <p className="text-gray-500">Orders will appear here when customers place them</p>
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 text-center">
+          <p className="text-base font-semibold text-gray-900 mb-2">No orders yet</p>
+          <p className="text-sm text-gray-500">Orders will appear here when customers place them</p>
         </div>
       ) : (
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
@@ -238,7 +459,13 @@ const OrdersView = () => {
                     Customer
                   </th>
                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                    Status
+                    Payment Status
+                  </th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                    Order Status
+                  </th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                    Actions
                   </th>
                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
                     Time
@@ -246,11 +473,17 @@ const OrdersView = () => {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {orders.map((order, index) => (
+                {orders.map((order, index) => {
+                  const isUnpaid = order.payment_status === 'pending';
+                  const isPendingOrder = order.order_status === 'pending';
+                  
+                  return (
                   <tr 
                     key={order.id}
                     className={`hover:bg-gray-50 transition-colors ${
-                      index === 0 ? 'bg-blue-50 animate-pulse-once border-l-4 border-l-blue-500' : ''
+                      index === 0 && isPendingOrder ? 'bg-blue-50 animate-pulse-once border-l-4 border-l-blue-500' : ''
+                    } ${
+                      isUnpaid ? 'bg-red-50 border-l-4 border-l-red-500' : ''
                     }`}
                   >
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -283,15 +516,63 @@ const OrdersView = () => {
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(order.payment_status)}`}>
-                        {order.payment_status.toUpperCase()}
+                      <div className="flex flex-col gap-1">
+                        <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(order.payment_status)}`}>
+                          {order.payment_status.toUpperCase()}
+                        </span>
+                        {isUnpaid && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-red-600 text-white animate-pulse">
+                            BILL UNPAID
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${getOrderStatusColor(order.order_status || 'pending')}`}>
+                        {order.order_status ? order.order_status.toUpperCase() : 'PENDING'}
                       </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {order.order_status === 'pending' && (
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => handleAcceptOrder(order.id)}
+                            className="px-3 py-1.5 bg-green-600 text-white text-xs font-semibold rounded-lg hover:bg-green-700 transition-colors shadow-sm hover:shadow-md"
+                          >
+                            Accept
+                          </button>
+                          <button
+                            onClick={() => handleRejectOrder(order.id)}
+                            className="px-3 py-1.5 bg-red-600 text-white text-xs font-semibold rounded-lg hover:bg-red-700 transition-colors shadow-sm hover:shadow-md"
+                          >
+                            Reject
+                          </button>
+                        </div>
+                      )}
+                      {order.order_status === 'accepted' && (
+                        <div className="flex flex-col gap-2">
+                          <span className="text-xs text-green-600 font-medium">Accepted</span>
+                          <button
+                            onClick={() => handleCompleteOrder(order.id)}
+                            className="px-3 py-1.5 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 transition-colors shadow-sm hover:shadow-md"
+                          >
+                            Mark as Completed
+                          </button>
+                        </div>
+                      )}
+                      {order.order_status === 'rejected' && (
+                        <span className="text-xs text-red-600 font-medium">Rejected</span>
+                      )}
+                      {order.order_status === 'completed' && (
+                        <span className="text-xs text-blue-600 font-medium">Completed</span>
+                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {new Date(order.created_at).toLocaleString()}
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>

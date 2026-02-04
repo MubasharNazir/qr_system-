@@ -31,11 +31,11 @@ const AdminDashboard = () => {
   const isActive = (path) => location.pathname === path;
 
   const menuItems = [
-    { path: '/admin/dashboard', label: 'Dashboard', icon: '📊' },
-    { path: '/admin/orders', label: 'Orders', icon: '📦' },
-    { path: '/admin/menu', label: 'Menu', icon: '🍽️' },
-    { path: '/admin/tables', label: 'Tables', icon: '🪑' },
-    { path: '/admin/qr-codes', label: 'QR Codes', icon: '📱' },
+    { path: '/admin/dashboard', label: 'Dashboard' },
+    { path: '/admin/orders', label: 'Orders' },
+    { path: '/admin/menu', label: 'Menu' },
+    { path: '/admin/tables', label: 'Tables' },
+    { path: '/admin/qr-codes', label: 'QR Codes' },
   ];
 
   return (
@@ -46,7 +46,7 @@ const AdminDashboard = () => {
         <div className="p-6 border-b border-slate-700">
           <div className="flex items-center justify-between">
             {sidebarOpen && (
-              <h1 className="text-xl font-bold text-white">Restaurant Admin</h1>
+              <h1 className="text-lg font-bold text-white">Restaurant Admin</h1>
             )}
             <button
               onClick={() => setSidebarOpen(!sidebarOpen)}
@@ -63,15 +63,14 @@ const AdminDashboard = () => {
             <Link
               key={item.path}
               to={item.path}
-              className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 ${
+              className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all duration-200 ${
                 isActive(item.path)
                   ? 'bg-blue-600 text-white shadow-lg'
                   : 'text-slate-300 hover:bg-slate-700 hover:text-white'
               }`}
             >
-              <span className="text-xl">{item.icon}</span>
               {sidebarOpen && (
-                <span className="font-medium">{item.label}</span>
+                <span className="text-sm font-medium">{item.label}</span>
               )}
             </Link>
           ))}
@@ -81,12 +80,11 @@ const AdminDashboard = () => {
         <div className="p-4 border-t border-slate-700">
           <button
             onClick={handleLogout}
-            className={`flex items-center gap-3 w-full px-4 py-3 rounded-lg text-slate-300 hover:bg-red-600 hover:text-white transition-all duration-200 ${
+            className={`flex items-center gap-3 w-full px-4 py-2.5 rounded-lg text-slate-300 hover:bg-red-600 hover:text-white transition-all duration-200 ${
               !sidebarOpen && 'justify-center'
             }`}
           >
-            <span className="text-xl">🚪</span>
-            {sidebarOpen && <span className="font-medium">Logout</span>}
+            {sidebarOpen && <span className="text-sm font-medium">Logout</span>}
           </button>
         </div>
       </aside>
@@ -98,14 +96,14 @@ const AdminDashboard = () => {
           <div className="px-6 py-4">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-2xl font-bold text-gray-900">
+                <h2 className="text-xl font-bold text-gray-900">
                   {menuItems.find(item => isActive(item.path))?.label || 'Dashboard'}
                 </h2>
-                <p className="text-sm text-gray-500 mt-1">Manage your restaurant operations</p>
+                <p className="text-xs text-gray-500 mt-0.5">Manage your restaurant operations</p>
               </div>
               <div className="flex items-center gap-4">
                 <div className="text-right">
-                  <p className="text-sm font-medium text-gray-900">Admin</p>
+                  <p className="text-xs font-medium text-gray-900">Admin</p>
                   <p className="text-xs text-gray-500">System Administrator</p>
                 </div>
                 <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center text-white font-semibold">
