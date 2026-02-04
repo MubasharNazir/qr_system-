@@ -24,25 +24,22 @@ from app.schemas.admin import (
 )
 from app.config import settings
 from app.services.websocket_manager import manager
-import secrets
+from app.services.jwt_service import create_admin_token, verify_admin_token as verify_jwt_token
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
 # Admin password from settings
 ADMIN_PASSWORD = settings.ADMIN_PASSWORD
 
-# Store active sessions (in production, use Redis or JWT)
-admin_sessions = {}
-
 
 def verify_admin_token(authorization: Optional[str] = Header(None)):
-    """Verify admin authentication token."""
+    """Verify admin authentication token (JWT)."""
     if not authorization:
         raise HTTPException(status_code=401, detail="Missing authorization header")
     
     token = authorization.replace("Bearer ", "") if authorization.startswith("Bearer ") else authorization
     
-    if token not in admin_sessions:
+    if not verify_jwt_token(token):
         raise HTTPException(status_code=401, detail="Invalid or expired token")
     
     return token
@@ -52,24 +49,28 @@ def verify_admin_token(authorization: Optional[str] = Header(None)):
 async def admin_login(credentials: AdminLoginRequest):
     """
     Admin login with static password.
-    Returns a session token.
+    Returns a JWT token that persists across server restarts.
     """
     if credentials.password != ADMIN_PASSWORD:
         raise HTTPException(status_code=401, detail="Invalid password")
     
-    # Generate session token
-    token = secrets.token_urlsafe(32)
-    admin_sessions[token] = True
+    # Generate JWT token (stateless, persists across restarts)
+    token = create_admin_token()
     
     return AdminLoginResponse(token=token, message="Login successful")
 
 
 @router.post("/logout")
 async def admin_logout(token: str = Depends(verify_admin_token)):
-    """Logout admin and invalidate session."""
-    if token in admin_sessions:
-        del admin_sessions[token]
-    return {"message": "Logout successful"}
+    """
+    Logout admin.
+    Note: With JWT, tokens are stateless. Client should discard the token.
+    For immediate invalidation, consider using a token blacklist (Redis/database).
+    """
+    # With JWT, we can't invalidate tokens server-side without a blacklist.
+    # The client should discard the token.
+    # For production, consider implementing a token blacklist in Redis/database.
+    return {"message": "Logout successful. Please discard your token on the client side."}
 
 
 # ==================== Categories Management ====================
@@ -766,24 +767,34 @@ async def complete_order(
 # ==================== WebSocket for Order Notifications ====================
 
 @router.websocket("/orders/ws")
-async def websocket_orders(websocket: WebSocket, token: Optional[str] = None):
+async def websocket_orders(websocket: WebSocket):
     """
     WebSocket endpoint for real-time order notifications.
     Requires admin authentication token as query parameter.
     """
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    # Accept the connection first (required in FastAPI)
+    await websocket.accept()
+    
     # Get token from query parameter
     token = websocket.query_params.get("token")
     
+    # Verify token and close if invalid
     if not token:
+        logger.warning("WebSocket connection rejected: Missing token")
         await websocket.close(code=1008, reason="Missing authentication token")
         return
     
-    # Verify token
-    if token not in admin_sessions:
-        await websocket.close(code=1008, reason="Invalid authentication token")
+    # Verify JWT token
+    if not verify_jwt_token(token):
+        logger.warning("WebSocket connection rejected: Invalid or expired JWT token")
+        await websocket.close(code=1008, reason="Invalid or expired authentication token")
         return
     
     # Connect to WebSocket manager
+    logger.info(f"WebSocket connection accepted for token: {token[:10]}...")
     await manager.connect(websocket)
     
     try:
@@ -799,4 +810,7 @@ async def websocket_orders(websocket: WebSocket, token: Optional[str] = None):
     except Exception as e:
         import logging
         logging.error(f"WebSocket error: {e}")
-        manager.disconnect(websocket)
+        try:
+            manager.disconnect(websocket)
+        except:
+            pass

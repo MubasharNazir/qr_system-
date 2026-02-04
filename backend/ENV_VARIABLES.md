@@ -101,7 +101,33 @@ ADMIN_PASSWORD=your_secure_password_here
 
 ---
 
-### 9. CORS_ORIGINS
+### 9. JWT_SECRET_KEY
+**Required:** No (defaults to `your-secret-key-change-in-production`)  
+**Description:** Secret key for signing JWT tokens. Used for admin authentication that persists across server restarts.  
+**Example:**
+```env
+JWT_SECRET_KEY=your-super-secret-random-key-at-least-32-characters-long
+```
+**⚠️ Important:** 
+- Change this in production!
+- Use a long, random string (at least 32 characters)
+- Keep it secret - never commit to version control
+- Generate with: `python -c "import secrets; print(secrets.token_urlsafe(32))"`
+
+---
+
+### 10. JWT_EXPIRATION_HOURS
+**Required:** No (defaults to `24`)  
+**Description:** Number of hours before JWT tokens expire  
+**Example:**
+```env
+JWT_EXPIRATION_HOURS=24
+```
+**Note:** Tokens automatically expire after this time. Users will need to log in again.
+
+---
+
+### 11. CORS_ORIGINS
 **Required:** No (defaults to FRONTEND_URL + localhost:3000)  
 **Description:** Comma-separated list of allowed CORS origins  
 **Example:**
@@ -111,6 +137,7 @@ CORS_ORIGINS=https://your-frontend.pages.dev,https://www.yourdomain.com
 **When to set:** Only if you need multiple frontend URLs
 
 ---
+
 
 ## 📋 Complete .env File Template
 
@@ -140,6 +167,12 @@ ENVIRONMENT=production
 # Admin Password (CHANGE THIS!)
 ADMIN_PASSWORD=your_secure_password_here
 
+# JWT Secret Key (CHANGE THIS! Generate a secure random key)
+JWT_SECRET_KEY=your-super-secret-random-key-at-least-32-characters-long
+
+# JWT Token Expiration (optional, defaults to 24 hours)
+JWT_EXPIRATION_HOURS=24
+
 # Port (usually set by hosting platform)
 PORT=8000
 
@@ -157,7 +190,7 @@ PORT=8000
 3. ✅ `STRIPE_PUBLISHABLE_KEY`
 4. ✅ `STRIPE_WEBHOOK_SECRET`
 
-**Recommended for production (8 variables):**
+**Recommended for production (10 variables):**
 1. ✅ `DATABASE_URL`
 2. ✅ `STRIPE_SECRET_KEY`
 3. ✅ `STRIPE_PUBLISHABLE_KEY`
@@ -165,7 +198,9 @@ PORT=8000
 5. ✅ `FRONTEND_URL` (set to production URL)
 6. ✅ `ENVIRONMENT=production`
 7. ✅ `ADMIN_PASSWORD` (change from default)
-8. ✅ `PORT` (usually auto-set by platform)
+8. ✅ `JWT_SECRET_KEY` (change from default, use secure random key)
+9. ✅ `JWT_EXPIRATION_HOURS` (optional, defaults to 24)
+10. ✅ `PORT` (usually auto-set by platform)
 
 ---
 
@@ -216,6 +251,7 @@ When deploying to Render, make sure these are set:
 - [ ] `FRONTEND_URL` - Your Cloudflare Pages URL
 - [ ] `ENVIRONMENT=production`
 - [ ] `ADMIN_PASSWORD` - Your secure password
+- [ ] `JWT_SECRET_KEY` - Your secure random key (generate with: `python -c "import secrets; print(secrets.token_urlsafe(32))"`)
 - [ ] `PORT=8000` (or let Render set it automatically)
 
 ---

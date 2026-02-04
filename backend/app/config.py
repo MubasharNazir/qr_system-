@@ -25,6 +25,9 @@ class Settings(BaseSettings):
     
     # Admin
     ADMIN_PASSWORD: str = "admin123"  # Change this in production!
+    JWT_SECRET_KEY: str = "your-secret-key-change-in-production"  # Change this in production!
+    JWT_ALGORITHM: str = "HS256"
+    JWT_EXPIRATION_HOURS: int = 24  # Token expires after 24 hours
     
     # CORS (comma-separated string from env, or default list)
     CORS_ORIGINS: Optional[str] = None

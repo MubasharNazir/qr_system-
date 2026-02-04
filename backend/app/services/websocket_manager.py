@@ -16,8 +16,7 @@ class ConnectionManager:
         self.active_connections: Set[WebSocket] = set()
     
     async def connect(self, websocket: WebSocket):
-        """Accept a new WebSocket connection."""
-        await websocket.accept()
+        """Add a WebSocket connection to the manager (connection should already be accepted)."""
         self.active_connections.add(websocket)
         logger.info(f"WebSocket connected. Total connections: {len(self.active_connections)}")
     

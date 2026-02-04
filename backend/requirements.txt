@@ -7,3 +7,4 @@ pydantic-settings
 stripe
 alembic
 python-dotenv
+pyjwt[crypto]
