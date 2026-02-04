@@ -17,6 +17,14 @@ class PaymentStatus(str, enum.Enum):
     FAILED = "failed"
 
 
+class OrderStatus(str, enum.Enum):
+    """Order status enumeration."""
+    PENDING = "pending"
+    ACCEPTED = "accepted"
+    REJECTED = "rejected"
+    COMPLETED = "completed"
+
+
 class Order(Base):
     """Order model."""
     
@@ -25,6 +33,10 @@ class Order(Base):
         CheckConstraint(
             "payment_status IN ('pending', 'paid', 'failed')",
             name="check_payment_status"
+        ),
+        CheckConstraint(
+            "order_status IN ('pending', 'accepted', 'rejected', 'completed')",
+            name="check_order_status"
         ),
     )
     
@@ -36,6 +48,7 @@ class Order(Base):
     special_instructions = Column(Text, nullable=True)
     # Use String instead of Enum to match database schema (VARCHAR with CHECK constraint)
     payment_status = Column(String(20), default=PaymentStatus.PENDING.value, nullable=False, index=True)
+    order_status = Column(String(20), default=OrderStatus.PENDING.value, nullable=False, index=True)
     stripe_session_id = Column(String(255), unique=True, nullable=True, index=True)
     stripe_payment_intent_id = Column(String(255), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False, index=True)
@@ -45,4 +58,4 @@ class Order(Base):
     table = relationship("Table", backref="orders")
     
     def __repr__(self) -> str:
-        return f"<Order(id={self.id}, table_id={self.table_id}, status={self.payment_status})>"
+        return f"<Order(id={self.id}, table_id={self.table_id}, payment_status={self.payment_status}, order_status={self.order_status})>"

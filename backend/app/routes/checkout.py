@@ -103,6 +103,7 @@ async def create_checkout_session(
             "customer_name": order.customer_name,
             "special_instructions": order.special_instructions,
             "payment_status": order.payment_status,
+            "order_status": getattr(order, 'order_status', 'pending'),
             "created_at": order.created_at.isoformat(),
         }
         await manager.broadcast_order(order_data)
@@ -182,6 +183,7 @@ async def create_order_without_payment(
             "customer_name": order_customer_name,
             "special_instructions": order_instructions,
             "payment_status": order_status,
+            "order_status": "pending",
             "created_at": order_created_at,
         }
         await manager.broadcast_order(order_data)

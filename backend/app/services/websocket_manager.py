@@ -51,6 +51,36 @@ class ConnectionManager:
             self.disconnect(connection)
         
         logger.info(f"Broadcasted order to {len(self.active_connections)} clients")
+    
+    async def broadcast_order_status_update(self, order_id: str, order_status: str, order_data: dict):
+        """Broadcast an order status update to all connected clients."""
+        if not self.active_connections:
+            logger.info("No active WebSocket connections to broadcast to")
+            return
+        
+        message = json.dumps({
+            "type": "order_status_update",
+            "data": {
+                "order_id": order_id,
+                "order_status": order_status,
+                **order_data
+            }
+        })
+        
+        # Send to all connected clients
+        disconnected = set()
+        for connection in self.active_connections:
+            try:
+                await connection.send_text(message)
+            except Exception as e:
+                logger.error(f"Error sending message to WebSocket: {e}")
+                disconnected.add(connection)
+        
+        # Remove disconnected connections
+        for connection in disconnected:
+            self.disconnect(connection)
+        
+        logger.info(f"Broadcasted order status update to {len(self.active_connections)} clients")
 
 
 # Global instance
